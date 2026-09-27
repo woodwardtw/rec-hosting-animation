@@ -1,0 +1,331 @@
+/* ============================================================
+   Everything is namespaced .rh- so it can drop into an
+   Elementor HTML widget without colliding with theme CSS.
+   ============================================================ */
+
+.rh-shelf-block {
+  --rh-red:   #934745;
+  --rh-navy:  #1e3a52;
+  --rh-cream: #ebe2d9;
+  --rh-tan:   #a9855e;
+  --rh-ink:   #1b1b1b;
+
+  /* Sampled from post-46587.css so the card matches the page cards. */
+  --rh-heading: #2f495a;
+  --rh-label:   #566987;
+  --rh-body:    #4a4a4a;
+  --rh-cta:     #c9330a;
+  --rh-focus-ring: #1e3a52;
+  --rh-focus-halo: #f2b705;
+
+  /* Motion parallels .click-DoOO in post-46587.css: a single
+     simultaneous rotate + scale over 1s ease, no intermediate beat. */
+  --rh-eject-duration: 1s;
+  --rh-hover-scale: 1.12;
+
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--rh-ink);
+}
+
+/* ---------- Shelf ---------- */
+
+.rh-shelf {
+  position: relative;
+  aspect-ratio: 1899 / 978;
+  /* Container query units let each tape slice line up with the
+     artwork without any JS measurement. */
+  container-type: size;
+  container-name: rh-shelf;
+  overflow: visible;          /* never clip a focus ring or a tape mid-eject */
+}
+
+.rh-shelf__art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transition: opacity .35s ease, filter .35s ease;
+}
+
+.rh-shelf.is-open .rh-shelf__art,
+.rh-shelf.is-open .rh-tape__art {
+  opacity: .3;
+  filter: blur(2px);
+}
+
+.rh-tape__art { transition: opacity .35s ease, filter .35s ease; }
+
+.rh-shelf__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* ---------- Tape hotspots ---------- */
+
+.rh-tape {
+  position: absolute;
+  left:   calc(var(--l) * 1cqw);
+  top:    calc(var(--t) * 1cqh);
+  width:  calc(var(--w) * 1cqw);
+  height: calc(var(--h) * 1cqh);
+
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  overflow: hidden;           /* clips the art slice to this tape */
+  transform-origin: 50% 50%;
+  transition: transform .3s ease;
+  border-radius: 2px;
+}
+
+.rh-tape[data-shape="disc"] { border-radius: 50%; }
+
+/* EDU tape sits in front of the record in the artwork. */
+.rh-tape[data-product="edu"] { z-index: 2; }
+
+/* Each button carries a full-size copy of the shelf art, offset so
+   that only its own region shows through. */
+.rh-tape__art {
+  position: absolute;
+  left:   calc(var(--l) * -1cqw);
+  top:    calc(var(--t) * -1cqh);
+  width:  100cqw;
+  height: 100cqh;
+  background: url("https://www.reclaimhosting.com/wp-content/uploads/2026/05/Untitled_Artwork-6-1.png") 0 0 / 100% 100% no-repeat;
+  pointer-events: none;
+}
+
+.rh-tape__label {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Focus: dark ring plus amber halo so it reads on both the white
+   page and the near-black tape. Offset keeps it off the artwork. */
+.rh-tape:focus-visible {
+  outline: 3px solid var(--rh-focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 7px var(--rh-focus-halo);
+}
+
+/* .click-DoOO:hover grows the tape 1.2x. Same idea here, but at
+   .3s rather than the mockup's 1s — a one-second hover response
+   reads as lag. .3s is already the mockup's own panel timing. */
+.rh-tape:hover,
+.rh-tape:focus-visible { transform: scale(var(--rh-hover-scale)); z-index: 5; }
+
+/* ---------- Hero reveal ----------
+   Mirrors .click-DoOO / .DoOODescription in post-46587.css exactly,
+   just relocated into the dialog: the header image starts turned
+   and small, straightens to full size in place over 1s ease, and
+   only once that finishes does the description content fade in
+   below it. Nothing moves across the page — a native <dialog> is
+   promoted to the browser's top layer the instant showModal() runs,
+   which renders it above everything outside it regardless of
+   z-index, so anything meant to be seen mid-motion has to live
+   inside the dialog from the start, not fly in from the shelf. */
+
+.rh-dialog__title img {
+  transform-origin: 50% 50%;
+  transition: transform var(--rh-eject-duration) ease;
+  transform: rotate(var(--rh-hero-start-rotate, -90deg)) scale(.5);
+}
+.rh-dialog__title img.active { transform: rotate(0deg) scale(1); }
+
+/* Fields and actions stay reserved-but-invisible until the hero
+   settles, then fade in — same two-step beat as the mockup's
+   content, minus its display:none (which would jump the dialog's
+   height right as the image finishes; opacity keeps that steady). */
+.rh-dialog__grid,
+.rh-dialog__actions {
+  opacity: 0;
+  transition: opacity .5s ease;
+}
+.rh-dialog__grid.show,
+.rh-dialog__actions.show { opacity: 1; }
+
+/* ---------- Dialog ----------
+   Matches the "Content Description Cards" on the page: white card,
+   20px radius, 0 0 10px rgba(0,0,0,.22) shadow, the horizontal tape
+   art as the heading, then italic #566987 field labels each marked
+   with an outlined square, in two columns. */
+
+.rh-dialog {
+  width: min(64rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 3rem);
+  padding: 0;
+  border: 0;
+  border-radius: 20px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, .22);
+  background: #fff;
+  color: var(--rh-body);
+  font-family: "Inter", system-ui, sans-serif;
+  overflow: auto;
+  overscroll-behavior: contain;
+  transition: background-color .4s ease, box-shadow .4s ease;
+}
+
+/* While the hero is turning/growing into place (open) or turning
+   back down (close), the dialog's own white surface, close button,
+   and scrollbar all stay out of the way — just the image, floating
+   over the dimmed page. On open this fades in once the hero settles,
+   same moment as the fields/buttons. On close it's the first thing
+   to go, before the hero starts moving back. */
+.rh-dialog.rh-bg-hidden {
+  background: transparent;
+  box-shadow: none;
+  overflow: hidden;
+}
+.rh-dialog.rh-bg-hidden .rh-dialog__close {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Suppresses the background/box-shadow transition for exactly one
+   style commit — applied together with rh-bg-hidden right before
+   showModal() so the very first rendered frame is instantly
+   transparent, with no transition value in flight to fade or flash. */
+.rh-dialog.rh-no-transition,
+.rh-dialog.rh-no-transition .rh-dialog__close { transition: none !important; }
+
+.rh-dialog::backdrop { background: rgba(27, 27, 27, .62); }
+
+.rh-dialog__card {
+  position: relative;
+  padding: 3.75rem 6% 2rem;
+}
+
+/* The tape art is the heading. Its alt carries the product name, so
+   there is no separate title line to duplicate it. */
+.rh-dialog__title { margin: 0 0 2rem; }
+.rh-dialog__title img { display: block; width: 100%; height: auto; }
+.rh-dialog__title--text {
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: var(--rh-heading);
+}
+
+.rh-dialog__close {
+  position: absolute;
+  top: .75rem;
+  inset-inline-end: .75rem;
+  width: 44px;
+  height: 44px;
+  border: 2px solid var(--rh-label);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--rh-label);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 1;
+  transition: opacity .3s ease;
+}
+.rh-dialog__close:hover { background: var(--rh-label); color: #fff; }
+.rh-dialog__close:focus-visible {
+  outline: 3px solid var(--rh-focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 7px var(--rh-focus-halo);
+}
+
+/* ---------- Fields ---------- */
+
+.rh-dialog__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.9rem 3rem;
+}
+
+.rh-field--full { grid-column: 1 / -1; }
+
+.rh-field h3 {
+  display: flex;
+  align-items: baseline;
+  gap: .7rem;
+  margin: 0 0 .5rem;
+  font-size: 1.1rem;
+  font-style: italic;
+  font-weight: 400;
+  color: var(--rh-label);
+}
+
+/* Decorative square marker, matching the icon-list glyph. */
+.rh-field h3::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  transform: translateY(1px);
+}
+
+.rh-field__body {
+  margin-inline-start: 30px;
+  font-size: 1rem;
+  font-weight: 300;
+  line-height: 1.55;
+}
+.rh-field__body p  { margin: 0; }
+.rh-field__body ul { margin: 0; padding-inline-start: 1.15rem; }
+
+/* ---------- Actions ---------- */
+
+.rh-dialog__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .5rem;
+  margin-top: 2.25rem;
+}
+
+.rh-btn {
+  display: inline-block;
+  padding: .62em 1.3em;
+  border: 0;
+  border-radius: 3px;
+  color: #fff;
+  font-family: "Roboto", system-ui, sans-serif;
+  text-decoration: none;
+  cursor: pointer;
+}
+.rh-btn--primary   { background: var(--rh-cta); font-size: 1.3rem; font-weight: 500; }
+.rh-btn--secondary { background: var(--rh-label); font-size: 1rem; font-weight: 400; }
+.rh-btn:hover { text-decoration: underline; }
+.rh-btn:focus-visible {
+  outline: 3px solid var(--rh-focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 7px var(--rh-focus-halo);
+}
+
+@media (max-width: 47.9375em) {
+  .rh-dialog__grid { grid-template-columns: 1fr; }
+  .rh-dialog__card { padding: 2rem 1.25rem 1.5rem; }
+  .rh-field__body  { margin-inline-start: 21px; }
+}
+
+
+/* ---------- Reduced motion ----------
+   The eject is decoration. Skip it entirely rather than shortening
+   it, and open the dialog straight away. */
+
+@media (prefers-reduced-motion: reduce) {
+  .rh-dialog__title img, .rh-dialog, .rh-dialog__close,
+  .rh-dialog__grid, .rh-dialog__actions { transition: none !important; }
+  .rh-tape:hover,
+  .rh-tape:focus-visible { transform: none; }
+  .rh-tape, .rh-shelf__art, .rh-tape__art, .rh-dialog__body { transition: none; animation: none; }
+}
+
+/* ---------- Demo page chrome (not part of the component) ---------- */
+body { margin: 0; padding: 2.5rem 1rem; background: #fff;
+       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.rh-demo-note { max-width: 1200px; margin: 0 auto 2rem; color: #444; line-height: 1.55; }
+.rh-demo-note h1 { font-size: 1.5rem; margin: 0 0 .5rem; }
