@@ -12,7 +12,7 @@ if (!defined('ABSPATH')) {
 
 //only enqueue assets on the specific page
 function rec_hosting_animation_enqueue_assets() {
-	if (!is_page(46587)) {
+	if (!is_page(186)) {
 		return;
 	}
 
