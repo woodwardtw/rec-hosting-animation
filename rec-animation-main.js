@@ -1,19 +1,28 @@
 /* Script for the live Product Overview page. That page has no
-   shelf/dialog markup — just the shelf artwork as a plain Elementor
-   image widget, followed by the "Content Description Cards". So this
-   script builds the tape hotspots over that image and the dialog,
-   then runs the open/close animation. Styles live in
-   rec-animation-main.css, enqueued alongside this file.
+   shelf/dialog markup — just the "Our Offerings" intro followed by
+   the "Content Description Cards". So this script adds the shelf
+   artwork (bundled in imgs/) above the first card, builds the tape
+   hotspots over it and the dialog, then runs the open/close
+   animation. Styles live in rec-animation-main.css, enqueued
+   alongside this file.
 
-   Without JS the page is unchanged: a plain image plus the cards. */
+   Without JS the page is unchanged: just the intro and the cards. */
 (() => {
   'use strict';
 
   /* Captured now: document.currentScript is null once this has run. */
   const SCRIPT_URL = (document.currentScript && document.currentScript.src) || location.href;
 
-  /* The Elementor image widget holding the shelf artwork. */
-  const SHELF_ART_SELECTOR = 'img[src*="Untitled_Artwork-6-1"]';
+  /* Shelf artwork shipped with the plugin. If an Elementor image
+     widget with the same artwork is ever put back on the page, that
+     image is used in place instead. */
+  const SHELF_ART_SRC = 'imgs/Untitled_Artwork 6 (2).png';
+  const SHELF_ART_SELECTOR = 'img[src*="Untitled_Artwork-6"]';
+  const SHELF_ART_ALT = 'A shelf of Reclaim Hosting products: four VHS tapes, a record and a VHS tape lying flat';
+
+  /* Every card is the top-level column holding an <h1 aria-label>
+     tape image. */
+  const CARD_HEADING_SELECTOR = '.elementor-top-column h1[aria-label]';
 
   /* Hotspot positions are percentages of the artwork (same as the
      prototype). `img` is only for a tape with no card on the page;
@@ -24,7 +33,7 @@
     { product: 'managed', shape: 'spine', l: 36.39, t: 2.04,  w: 6.16,  h: 86.41, href: 'https://www.reclaimhosting.com/managed-hosting/',     label: 'Managed Hosting' },
     { product: 'dooo',    shape: 'spine', l: 43.02, t: 2.04,  w: 6.16,  h: 86.41, href: 'https://www.reclaimhosting.com/domain-of-ones-own/',  label: 'Domain of One’s Own' },
     { product: 'cloud',   shape: 'disc',  l: 50.03, t: 14.72, w: 31.81, h: 61.30, href: 'https://reclaim.cloud/',                             label: 'Reclaim Cloud' },
-    { product: 'edu',     shape: 'flat',  l: 49.45, t: 76.28, w: 44.44, h: 12.17, href: 'https://www.reclaimhosting.com/edu/',                label: 'ReclaimEDU', img: 'reclaimEdu.jpg' },
+    { product: 'edu',     shape: 'flat',  l: 49.45, t: 76.28, w: 44.44, h: 12.17, href: 'https://www.reclaimhosting.com/edu/',                label: 'ReclaimEDU', img: 'imgs/reclaimEdu.jpg' },
   ];
 
   const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
@@ -35,18 +44,30 @@
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-  /* Wraps the existing shelf image in the shelf block and lays the
-     tape buttons over it. The dialog goes in its own .rh-shelf-block
+  /* Puts the shelf artwork in the shelf block and lays the tape
+     buttons over it. The dialog goes in its own .rh-shelf-block
      on <body>: out of Elementor's transformed/animated columns, while
      still inheriting the block's color and timing variables. */
-  const buildShelf = (art) => {
+  const buildShelf = (pageArt, firstCard) => {
     const block = document.createElement('div');
     block.className = 'rh-shelf-block';
     const shelf = document.createElement('div');
     shelf.className = 'rh-shelf';
-    shelf.style.setProperty('--rh-art', `url("${art.getAttribute('src')}")`);
 
-    art.replaceWith(block);
+    /* Use the page's own shelf image if there is one; otherwise add
+       the bundled artwork as its own block just above the first card. */
+    let art = pageArt;
+    if (art) {
+      art.replaceWith(block);
+    } else {
+      art = document.createElement('img');
+      art.src = new URL(SHELF_ART_SRC, SCRIPT_URL).href;
+      art.alt = SHELF_ART_ALT;
+      art.decoding = 'async';
+      const section = firstCard.closest('.elementor-top-section') || firstCard;
+      section.before(block);
+    }
+    shelf.style.setProperty('--rh-art', `url("${art.src}")`);
     art.classList.add('rh-shelf__art');
     shelf.appendChild(art);
 
@@ -87,12 +108,10 @@
 
   /* Product data is read from the Elementor "Content Description
      Cards" already on the page, so editing a card in Elementor
-     updates the shelf dialog too. Each card is the top-level column
-     holding an <h1 aria-label> tape image; it's matched to a shelf
+     updates the shelf dialog too. Each card is matched to a shelf
      tape by its "Learn more" link, which is the same URL the tape
-     links to. (The "Transition Mockup" above the cards uses an <h2>,
-     so it's never mistaken for a card.) */
-  const readProducts = (tapes) => {
+     links to. */
+  const readProducts = (tapes, cardHeadings) => {
     const FIELD_KEYS = {
       'short description':       'summary',
       'pricing':                 'pricing',
@@ -130,34 +149,47 @@
           : clean(body.textContent);
       });
 
+      /* The first real link is "Learn more"; the other button is
+         "Not Quite the Right Fit?", which is either an in-page
+         #anchor or (on most cards) a plain button with no link. */
       card.querySelectorAll('.elementor-widget-button a.elementor-button').forEach((a) => {
         const href = a.getAttribute('href') || '';
         const label = clean(a.textContent);
-        if (href.startsWith('#')) { p.nextHref = href; p.nextLabel = label; }
-        else if (!p.url) { p.url = href; p.cta = label; }
+        if (!href || href.startsWith('#')) {
+          if (!p.nextLabel) { p.hasNext = true; p.nextHref = href; p.nextLabel = label; }
+        } else if (!p.url) { p.url = href; p.cta = label; }
       });
       return p;
     };
 
     const products = {};
     const keyByCard = new Map();
-    document.querySelectorAll('.elementor-top-column h1[aria-label]').forEach((h1) => {
+    const cardOrder = [];
+    cardHeadings.forEach((h1) => {
       const card = h1.closest('.elementor-top-column');
       const p = readCard(card);
       const key = keyByUrl.get(normUrl(p.url));
       if (!key || products[key]) return;
       products[key] = p;
       keyByCard.set(card, key);
+      cardOrder.push(key);
     });
 
-    /* "Not Quite the Right Fit?" jumps to another card's anchor on
-       the page; resolve that anchor to the product it belongs to. */
-    Object.values(products).forEach((p) => {
+    /* "Not Quite the Right Fit?" either jumps to another card's
+       anchor (resolved to the product it belongs to) or has no link
+       yet, in which case it goes to the next card down the page,
+       wrapping from the last back to the first. */
+    cardOrder.forEach((key, i) => {
+      const p = products[key];
       let target = null;
-      try { target = p.nextHref && document.querySelector(p.nextHref); } catch (e) { /* bad selector */ }
+      if (p.nextHref.length > 1) {
+        try { target = document.querySelector(p.nextHref); } catch (e) { /* bad selector */ }
+      }
       const card = target && (target.closest('.elementor-top-column') || target);
-      p.next = (card && keyByCard.get(card)) || null;
+      const fallback = cardOrder.length > 1 ? cardOrder[(i + 1) % cardOrder.length] : null;
+      p.next = (card && keyByCard.get(card)) || (p.hasNext ? fallback : null);
       delete p.nextHref;
+      delete p.hasNext;
     });
 
     /* A tape with no card on the page (e.g. ReclaimEDU) still opens,
@@ -179,12 +211,13 @@
   };
 
   const init = () => {
-    const art = document.querySelector(SHELF_ART_SELECTOR);
     const probe = document.createElement('dialog');
-    if (!art || art.closest('.rh-shelf') || typeof probe.showModal !== 'function') return;
+    const cardHeadings = [...document.querySelectorAll(CARD_HEADING_SELECTOR)];
+    if (!cardHeadings.length || document.querySelector('.rh-shelf') ||
+        typeof probe.showModal !== 'function') return;
 
-    const shelf = buildShelf(art);
-    const PRODUCTS = readProducts([...shelf.querySelectorAll('.rh-tape')]);
+    const shelf = buildShelf(document.querySelector(SHELF_ART_SELECTOR), cardHeadings[0]);
+    const PRODUCTS = readProducts([...shelf.querySelectorAll('.rh-tape')], cardHeadings);
 
     /* Starting tilt for the hero image, per tape shape — a spine reads
        sideways on the shelf so it turns upright like the mockup's tape;
