@@ -207,6 +207,8 @@
    there is no separate title line to duplicate it. */
 .rh-shelf-block .rh-dialog__title { margin: 0 0 2rem; padding: 0; }
 .rh-shelf-block .rh-dialog__title img { display: block; width: 100%; max-width: none; height: auto; }
+/* The Reclaim Cloud logo is square, so full width is far too big. */
+.rh-shelf-block .rh-dialog__title img[src*="cloud-logo"] { width: 300px; max-width: 100%; margin: 0 auto; }
 .rh-shelf-block .rh-dialog__title--text {
   font-family: "Inter", system-ui, sans-serif;
   font-size: 2.2rem;
