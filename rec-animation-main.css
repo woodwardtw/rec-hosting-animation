@@ -8,6 +8,9 @@
    so without JS none of this applies and the page is unchanged.
    ============================================================ */
 
+/* Elementor product cards, hidden once the shelf has read them. */
+.rh-source-hidden { display: none !important; }
+
 .rh-shelf-block {
   --rh-red:   #934745;
   --rh-navy:  #1e3a52;
@@ -276,6 +279,21 @@
   height: 14px;
   border: 2px solid currentColor;
   transform: translateY(1px);
+}
+.rh-field--icon h3::before { content: none; }
+
+/* Icon copied from the matching heading on the page. */
+.rh-field__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  width: 1em;
+  justify-content: center;
+  transform: translateY(2px);
+}
+.rh-field__icon svg {
+  width: 1em;
+  height: 1em;
+  fill: currentColor;
 }
 
 .rh-shelf-block .rh-field__body {

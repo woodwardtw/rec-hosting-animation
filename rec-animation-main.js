@@ -16,7 +16,7 @@
   /* Shelf artwork shipped with the plugin. If an Elementor image
      widget with the same artwork is ever put back on the page, that
      image is used in place instead. */
-  const SHELF_ART_SRC = 'imgs/Untitled_Artwork 6 (2).png';
+  const SHELF_ART_SRC = 'imgs/whole-shelf.png';
   const SHELF_ART_SELECTOR = 'img[src*="Untitled_Artwork-6"]';
   const SHELF_ART_ALT = 'A shelf of Reclaim Hosting products: four VHS tapes, a record and a VHS tape lying flat';
 
@@ -133,16 +133,19 @@
         img: img ? img.getAttribute('src') : '',
         summary: '', pricing: '', level: '',
         idealFor: [], notFor: [], useCases: [], features: [],
-        url: '', cta: '', next: null, nextHref: '', nextLabel: '',
+        url: '', cta: '', nextLabel: '', icons: {},
       };
 
       /* Each heading is an icon-list widget; its value is the
-         text-editor widget that follows it in the same column. */
+         text-editor widget that follows it in the same column. The
+         heading's icon is kept so the dialog can show the same one. */
       card.querySelectorAll('.elementor-widget-icon-list').forEach((head) => {
         const key = FIELD_KEYS[clean(head.textContent).replace(/:$/, '').toLowerCase()];
         let body = head.nextElementSibling;
         while (body && !body.matches('.elementor-widget-text-editor')) body = body.nextElementSibling;
         if (!key || !body) return;
+        const svg = head.querySelector('.elementor-icon-list-icon svg');
+        if (svg) p.icons[key] = svg.outerHTML;
         const items = [...body.querySelectorAll('li')].map((li) => clean(li.textContent)).filter(Boolean);
         p[key] = LIST_KEYS.includes(key)
           ? (items.length ? items : [clean(body.textContent)].filter(Boolean))
@@ -151,45 +154,25 @@
 
       /* The first real link is "Learn more"; the other button is
          "Not Quite the Right Fit?", which is either an in-page
-         #anchor or (on most cards) a plain button with no link. */
+         #anchor or (on most cards) a plain button with no link.
+         In the dialog it just closes, so only its label matters. */
       card.querySelectorAll('.elementor-widget-button a.elementor-button').forEach((a) => {
         const href = a.getAttribute('href') || '';
         const label = clean(a.textContent);
         if (!href || href.startsWith('#')) {
-          if (!p.nextLabel) { p.hasNext = true; p.nextHref = href; p.nextLabel = label; }
+          if (!p.nextLabel) p.nextLabel = label;
         } else if (!p.url) { p.url = href; p.cta = label; }
       });
       return p;
     };
 
     const products = {};
-    const keyByCard = new Map();
-    const cardOrder = [];
     cardHeadings.forEach((h1) => {
       const card = h1.closest('.elementor-top-column');
       const p = readCard(card);
       const key = keyByUrl.get(normUrl(p.url));
       if (!key || products[key]) return;
       products[key] = p;
-      keyByCard.set(card, key);
-      cardOrder.push(key);
-    });
-
-    /* "Not Quite the Right Fit?" either jumps to another card's
-       anchor (resolved to the product it belongs to) or has no link
-       yet, in which case it goes to the next card down the page,
-       wrapping from the last back to the first. */
-    cardOrder.forEach((key, i) => {
-      const p = products[key];
-      let target = null;
-      if (p.nextHref.length > 1) {
-        try { target = document.querySelector(p.nextHref); } catch (e) { /* bad selector */ }
-      }
-      const card = target && (target.closest('.elementor-top-column') || target);
-      const fallback = cardOrder.length > 1 ? cardOrder[(i + 1) % cardOrder.length] : null;
-      p.next = (card && keyByCard.get(card)) || (p.hasNext ? fallback : null);
-      delete p.nextHref;
-      delete p.hasNext;
     });
 
     /* A tape with no card on the page (e.g. ReclaimEDU) still opens,
@@ -203,7 +186,7 @@
         img: t.dataset.img || '',
         summary: '', pricing: '', level: '',
         idealFor: [], notFor: [], useCases: [], features: [],
-        url: t.dataset.href || '', cta: '', next: null, nextLabel: '',
+        url: t.dataset.href || '', cta: '', nextLabel: '', icons: {},
       };
     });
 
@@ -219,6 +202,14 @@
     const shelf = buildShelf(document.querySelector(SHELF_ART_SELECTOR), cardHeadings[0]);
     const PRODUCTS = readProducts([...shelf.querySelectorAll('.rh-tape')], cardHeadings);
 
+    /* The cards are now only a data source for the dialog, so hide
+       them. They stay in the DOM (and visible without JS); a section
+       that also holds the shelf is left alone. */
+    cardHeadings.forEach((h1) => {
+      const section = h1.closest('.elementor-top-section') || h1.closest('.elementor-top-column');
+      if (!section.contains(shelf)) section.classList.add('rh-source-hidden');
+    });
+
     /* Starting tilt for the hero image, per tape shape — a spine reads
        sideways on the shelf so it turns upright like the mockup's tape;
        a disc/flat product is already right-side-up, so it only grows. */
@@ -231,7 +222,6 @@
     const closeBtn  = dialog.querySelector('.rh-dialog__close');
 
     let activeTape = null;
-    let pendingTape = null;
     let busy = false;
 
     /* Resolves once every transition on `el` finishes. A timeout is a
@@ -255,13 +245,16 @@
     const nextFrame = () =>
       new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-    const field = (label, value, full) => {
+    const field = (label, value, full, icon) => {
       if (!value || (Array.isArray(value) && !value.length)) return '';
       const inner = Array.isArray(value)
         ? `<ul>${value.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>`
         : `<p>${esc(value)}</p>`;
-      return `<div class="rh-field${full ? ' rh-field--full' : ''}">` +
-             `<h3>${esc(label)}</h3><div class="rh-field__body">${inner}</div></div>`;
+      /* The icon is markup copied from the page's own card, not user
+         text, so it goes in as-is. */
+      const head = icon ? `<span class="rh-field__icon">${icon}</span>${esc(label)}` : esc(label);
+      return `<div class="rh-field${full ? ' rh-field--full' : ''}${icon ? ' rh-field--icon' : ''}">` +
+             `<h3>${head}</h3><div class="rh-field__body">${inner}</div></div>`;
     };
 
     const fillDialog = (p, tape) => {
@@ -281,19 +274,18 @@
       }
 
       gridEl.innerHTML =
-        field('Short Description:', p.summary, true) +
-        field('Pricing:', p.pricing) +
-        field('Technical Comfort Level:', p.level) +
-        field('Ideal for:', p.idealFor) +
-        field('Not recommended for:', p.notFor) +
-        field('Popular Use Cases:', p.useCases) +
-        field('Key Features:', p.features);
+        field('Short Description:', p.summary, true, p.icons.summary) +
+        field('Pricing:', p.pricing, false, p.icons.pricing) +
+        field('Technical Comfort Level:', p.level, false, p.icons.level) +
+        field('Ideal for:', p.idealFor, false, p.icons.idealFor) +
+        field('Not recommended for:', p.notFor, false, p.icons.notFor) +
+        field('Popular Use Cases:', p.useCases, false, p.icons.useCases) +
+        field('Key Features:', p.features, false, p.icons.features);
 
-      const next = p.next && PRODUCTS[p.next];
       actionsEl.innerHTML =
         `<a class="rh-btn rh-btn--primary" href="${esc(p.url)}">${esc(p.cta || `Learn more about ${p.name}`)}</a>` +
-        (next ? `<button type="button" class="rh-btn rh-btn--secondary" data-next="${esc(p.next)}">` +
-                `${esc(p.nextLabel || 'Not Quite the Right Fit?')}</button>` : '');
+        (p.nextLabel ? '<button type="button" class="rh-btn rh-btn--secondary" data-close>' +
+                esc(p.nextLabel) + '</button>' : '');
 
       return heroImg;
     };
@@ -358,7 +350,6 @@
         dialog.close();
         if (tape) tape.focus();
         busy = false;
-        if (pendingTape) { const t = pendingTape; pendingTape = null; open(t); }
       };
 
       if (!heroImg || !tape) { finish(); return; }
@@ -408,15 +399,9 @@
 
     closeBtn.addEventListener('click', close);
 
-    /* On the page this button links to the next product's section.
-       Inside a dialog the equivalent is: close this one, open that one. */
+    /* "Not Quite the Right Fit?" just closes the dialog. */
     actionsEl.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-next]');
-      if (!btn) return;
-      const nextTape = shelf.querySelector(`.rh-tape[data-product="${btn.dataset.next}"]`);
-      if (!nextTape) return;
-      pendingTape = nextTape;
-      close();
+      if (e.target.closest('[data-close]')) close();
     });
 
     /* Clicking the backdrop closes. The dialog element itself fills the

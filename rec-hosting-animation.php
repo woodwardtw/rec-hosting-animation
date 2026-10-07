@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Reclaim Hosting Animation
  * Description: Enqueues the Reclaim Hosting animation assets on page 46587.
- * Version: 1.1.1
+ * Version: 1.1.2
  * Author: Reclaim Hosting
  */
 
@@ -22,14 +22,14 @@ function rec_hosting_animation_enqueue_assets() {
 		'rec-hosting-animation',
 		$plugin_url . 'rec-animation-main.css',
 		array(),
-		'1.1.1'
+		'1.1.2'
 	);
 
 	wp_enqueue_script(
 		'rec-hosting-animation',
 		$plugin_url . 'rec-animation-main.js',
 		array(),
-		'1.1.1',
+		'1.1.2',
 		array(
 			'in_footer' => true,
 			'strategy'  => 'defer',
