@@ -11,6 +11,12 @@
 /* Elementor product cards, hidden once the shelf has read them. */
 .rh-source-hidden { display: none !important; }
 
+/* At phone width the shelf hides too (same breakpoint as NARROW in
+   the script). */
+@media (max-width: 767px) {
+  .rh-shelf-block .rh-shelf { display: none; }
+}
+
 .rh-shelf-block {
   --rh-red:   #934745;
   --rh-navy:  #1e3a52;

@@ -24,6 +24,13 @@
      tape image. */
   const CARD_HEADING_SELECTOR = '.elementor-top-column h1[aria-label]';
 
+  /* Mobile-only copies of the cards (hidden on desktop and tablet by
+     Elementor) are left alone: not read, not hidden. */
+  const IGNORED_CARD_SELECTOR = '.elementor-hidden-desktop.elementor-hidden-tablet';
+
+  const getCardHeadings = () => [...document.querySelectorAll(CARD_HEADING_SELECTOR)]
+    .filter((h1) => !h1.closest(IGNORED_CARD_SELECTOR));
+
   /* Hotspot positions are percentages of the artwork (same as the
      prototype). `img` is only for a tape with no card on the page;
      relative paths resolve against this script's own folder. */
@@ -195,22 +202,30 @@
     return products;
   };
 
+  /* The shelf is too small to use on phones, so it isn't built there
+     and the stylesheet hides it at the same width on resize. */
+  const NARROW = window.matchMedia('(max-width: 767px)');
+
+  /* The cards are only a data source for the dialog, so hide them at
+     every size. They stay in the DOM (and visible without JS); a
+     section that also holds the shelf is left alone. */
+  const hideCards = (cardHeadings, shelf) => {
+    cardHeadings.forEach((h1) => {
+      const section = h1.closest('.elementor-top-section') || h1.closest('.elementor-top-column');
+      section.classList.toggle('rh-source-hidden', !(shelf && section.contains(shelf)));
+    });
+  };
+
   const init = () => {
     const probe = document.createElement('dialog');
-    const cardHeadings = [...document.querySelectorAll(CARD_HEADING_SELECTOR)];
+    const cardHeadings = getCardHeadings();
     if (!cardHeadings.length || document.querySelector('.rh-shelf') ||
         typeof probe.showModal !== 'function') return;
 
     const shelf = buildShelf(document.querySelector(SHELF_ART_SELECTOR), cardHeadings[0]);
     const PRODUCTS = readProducts([...shelf.querySelectorAll('.rh-tape')], cardHeadings);
 
-    /* The cards are now only a data source for the dialog, so hide
-       them. They stay in the DOM (and visible without JS); a section
-       that also holds the shelf is left alone. */
-    cardHeadings.forEach((h1) => {
-      const section = h1.closest('.elementor-top-section') || h1.closest('.elementor-top-column');
-      if (!section.contains(shelf)) section.classList.add('rh-source-hidden');
-    });
+    hideCards(cardHeadings, shelf);
 
     /* Starting tilt for the hero image, per tape shape — a spine reads
        sideways on the shelf so it turns upright like the mockup's tape;
@@ -418,11 +433,32 @@
       e.preventDefault();
       close();
     });
+
+    /* Shrinking to phone width hides the shelf, so drop any open
+       dialog straight away; with no active tape there's no flight. */
+    NARROW.addEventListener('change', () => {
+      if (!NARROW.matches || !dialog.open) return;
+      activeTape = null;
+      close();
+    });
+  };
+
+  /* Build the first time the page is wide enough, whether that's on
+     load or after widening the window. */
+  const start = () => {
+    if (!NARROW.matches) { init(); return; }
+    hideCards(getCardHeadings(), null);
+    const onChange = () => {
+      if (NARROW.matches) return;
+      NARROW.removeEventListener('change', onChange);
+      init();
+    };
+    NARROW.addEventListener('change', onChange);
   };
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', start);
   } else {
-    init();
+    start();
   }
 })();
