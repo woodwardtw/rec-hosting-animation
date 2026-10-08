@@ -295,6 +295,10 @@
   height: 1em;
   fill: currentColor;
 }
+.rh-field__icon i {
+  font-size: 1em;
+  line-height: 1;
+}
 
 .rh-shelf-block .rh-field__body {
   margin-inline-start: 30px;

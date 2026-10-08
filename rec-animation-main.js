@@ -144,8 +144,10 @@
         let body = head.nextElementSibling;
         while (body && !body.matches('.elementor-widget-text-editor')) body = body.nextElementSibling;
         if (!key || !body) return;
-        const svg = head.querySelector('.elementor-icon-list-icon svg');
-        if (svg) p.icons[key] = svg.outerHTML;
+        /* Inline SVG when Elementor's "Inline Font Icons" is on,
+           otherwise a Font Awesome <i> tag. */
+        const icon = head.querySelector('.elementor-icon-list-icon :is(svg, i)');
+        if (icon) p.icons[key] = icon.outerHTML;
         const items = [...body.querySelectorAll('li')].map((li) => clean(li.textContent)).filter(Boolean);
         p[key] = LIST_KEYS.includes(key)
           ? (items.length ? items : [clean(body.textContent)].filter(Boolean))
